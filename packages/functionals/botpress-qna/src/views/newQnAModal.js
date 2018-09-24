@@ -12,29 +12,27 @@ const ACTIONS = {
 }
 
 export default class NewQnAModal extends Component {
-  static defaultState() {
-    return {
-      newItem: {
-        questions: '',
-        answer: '',
-        redirectflow: '',
-        redirectnode: '',
-        action: ACTIONS.TEXT,
-        category: '',
-        enabled: true
-      },
-      valideFileds: {
-        category: true,
-        questions: true,
-        answer: true,
-        checkbox: true,
-        redirectflow: true,
-        redirectnode: true
-      },
-      isText: true,
-      isRedirect: false,
-      isValidForm: true
-    }
+  static defaultState = {
+    newItem: {
+      questions: '',
+      answer: '',
+      redirectFlow: '',
+      redirectNode: '',
+      action: ACTIONS.TEXT,
+      category: '',
+      enabled: true
+    },
+    validFields: {
+      category: true,
+      questions: true,
+      answer: true,
+      checkbox: true,
+      redirectFlow: true,
+      redirectNode: true
+    },
+    isText: true,
+    isRedirect: false,
+    isValidForm: true
   }
 
   static cleanupQuestions = questions =>
@@ -46,38 +44,30 @@ export default class NewQnAModal extends Component {
   constructor(props) {
     super(props)
 
-    this.state = NewQnAModal.defaultState()
+    this.state = NewQnAModal.defaultState
   }
 
   componentDidUpdate(prevProps) {
     const { id } = this.props
-
-    if (id && prevProps.id !== id) {
-      this.props.bp.axios.get(`/api/botpress-qna/${id}`).then(({ data }) => {
-        const { answer, questions, metadata } = data
-        const item = {
-          answer,
-          questions: questions.join('\n')
-        }
-
-        metadata.forEach(({ name, value }) => {
-          item[name] = value
-        })
-
-        this.setState({ newItem: item, isRedirect: item.redirectflow && item.redirectnode, isText: item.answer })
-      })
+    if (prevProps.id === id) {
+      return
     }
+    if (!id) {
+      return this.setState(NewQnAModal.defaultState)
+    }
+    this.props.bp.axios.get(`/api/botpress-qna/${id}`).then(({ data }) => {
+      const item = { ...data, questions: data.questions.join('\n') }
+      this.setState({
+        newItem: item,
+        isRedirect: [ACTIONS.REDIRECT, ACTIONS.TEXT_REDIRECT].includes(item.action),
+        isText: [ACTIONS.TEXT, ACTIONS.TEXT_REDIRECT].includes(item.action)
+      })
+    })
   }
 
   changeItemProperty = (key, value) => {
     const { newItem } = this.state
-
-    this.setState({
-      newItem: {
-        ...newItem,
-        [key]: value
-      }
-    })
+    this.setState({ newItem: { ...newItem, [key]: value } })
   }
 
   handleSelect = key => ({ value }) => this.changeItemProperty(key, value)
@@ -95,19 +85,19 @@ export default class NewQnAModal extends Component {
     const { hasCategory, categories } = this.props
     const { newItem, isText, isRedirect } = this.state
     const categoryWrapper = hasCategory ? { category: !categories.length || newItem.category } : {}
-    const valideFileds = {
+    const validFields = {
       ...categoryWrapper,
       questions: newItem.questions,
       answer: !this.state.isText || this.state.newItem.answer,
       checkbox: isText || isRedirect,
-      redirectflow: !this.state.isRedirect || this.state.newItem.redirectflow,
-      redirectnode: !this.state.isRedirect || this.state.newItem.redirectnode
+      redirectFlow: !this.state.isRedirect || this.state.newItem.redirectFlow,
+      redirectNode: !this.state.isRedirect || this.state.newItem.redirectNode
     }
 
-    this.setState({ valideFileds })
+    this.setState({ validFields })
 
-    for (const filed in valideFileds) {
-      if (!valideFileds[filed]) {
+    for (const field in validFields) {
+      if (!validFields[field]) {
         return true
       }
     }
@@ -162,7 +152,6 @@ export default class NewQnAModal extends Component {
   }
 
   onClose = () => {
-    this.setState(NewQnAModal.defaultState())
     this.props.toggleQnAModal()
   }
 
@@ -171,25 +160,25 @@ export default class NewQnAModal extends Component {
       return null
     }
 
-    const isValidInputs = Object.values(this.state.valideFileds).find(Boolean)
+    const isValidInputs = Object.values(this.state.validFields).find(Boolean)
 
     return (
       <div>
-        {!this.state.valideFileds.checkbox ? <Alert bsStyle="danger">Action checkbox is required</Alert> : null}
+        {!this.state.validFields.checkbox ? <Alert bsStyle="danger">Action checkbox is required</Alert> : null}
         {isValidInputs ? <Alert bsStyle="danger">Inputs are required</Alert> : null}
       </div>
     )
   }
 
   render() {
-    const { newItem: { redirectflow }, valideFileds } = this.state
+    const { newItem: { redirectFlow }, validFields } = this.state
     const { flows, flowsList, showQnAModal, categories, modalType } = this.props
-    const currentFlow = flows ? flows.find(({ name }) => name === redirectflow) || { nodes: [] } : { nodes: [] }
+    const currentFlow = flows ? flows.find(({ name }) => name === redirectFlow) || { nodes: [] } : { nodes: [] }
     const nodeList = currentFlow.nodes.map(({ name }) => ({ label: name, value: name }))
     const isEdit = modalType === 'edit'
 
     return (
-      <Modal className={`${style['new-qna-modal']} new-qna-modal`} show={showQnAModal} onHide={this.onClose}>
+      <Modal className={classnames(style['new-qna-modal'], 'new-qna-modal')} show={showQnAModal} onHide={this.onClose}>
         <form onSubmit={!isEdit ? this.onCreate : this.onEdit}>
           <Modal.Header className={style['qna-modal-header']}>
             <Modal.Title>{!isEdit ? 'Create a new' : 'Edit'} Q&A</Modal.Title>
@@ -202,7 +191,7 @@ export default class NewQnAModal extends Component {
                 <span className={style['qna-category__title']}>Category</span>
                 <Select
                   className={classnames(style['qna-category__select'], {
-                    'qna-category-error': !valideFileds.category
+                    'qna-category-error': !validFields.category
                   })}
                   value={this.state.newItem.category}
                   options={categories}
@@ -218,7 +207,7 @@ export default class NewQnAModal extends Component {
               </span>
               <FormControl
                 className={classnames(style['qna-questions__textarea'], {
-                  'qna-category-error': !valideFileds.questions
+                  'qna-category-error': !validFields.questions
                 })}
                 value={this.state.newItem.questions}
                 onChange={event => this.changeItemProperty('questions', event.target.value)}
@@ -234,7 +223,7 @@ export default class NewQnAModal extends Component {
                 </span>
                 <FormControl
                   className={classnames(style['qna-answer__textarea'], {
-                    'qna-category-error': !valideFileds.answer
+                    'qna-category-error': !validFields.answer
                   })}
                   value={this.state.newItem.answer}
                   onChange={event => this.changeItemProperty('answer', event.target.value)}
@@ -258,22 +247,22 @@ export default class NewQnAModal extends Component {
                   </span>
                   <Select
                     className={classnames(style['qna-redirect-to-flow-check__select'], {
-                      'qna-category-error': !valideFileds.redirectflow
+                      'qna-category-error': !validFields.redirectFlow
                     })}
-                    value={this.state.newItem.redirectflow}
+                    value={this.state.newItem.redirectFlow}
                     options={flowsList}
-                    onChange={this.handleSelect('redirectflow')}
+                    onChange={this.handleSelect('redirectFlow')}
                   />
                 </div>
                 <div className={style['qna-redirect-node']}>
                   <span className={style['qna-redirect-node__title']}>Node</span>
                   <Select
                     className={classnames(style['qna-redirect-node__select'], {
-                      'qna-category-error': !valideFileds.redirectnode
+                      'qna-category-error': !validFields.redirectNode
                     })}
-                    value={this.state.newItem.redirectnode}
+                    value={this.state.newItem.redirectNode}
                     options={nodeList}
-                    onChange={this.handleSelect('redirectnode')}
+                    onChange={this.handleSelect('redirectNode')}
                   />
                 </div>
               </div>
